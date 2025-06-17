@@ -1,47 +1,17 @@
-import { useAuth } from "../hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import StatCard from "@/components/StatCard";
 import { BarChart3, Users, Star, TrendingUp } from "lucide-react";
-import { useEffect, useState } from "react";
-
-interface Profile {
-  is_admin: boolean;
-  // other profile fields
-}
 
 export default function Dashboard() {
-  const { user } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (user) {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-        if (error) {
-          console.error("Error fetching profile:", error);
-        } else {
-          setProfile(data);
-        }
-      }
-    };
-    fetchProfile();
-  }, [user]);
-
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: async () => {
-      // Ensure you have an RPC function `get_admin_stats` in your Supabase SQL editor
       const { data, error } = await supabase.rpc("get_admin_stats");
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: !!profile?.is_admin,
   });
 
   const { data: recentRatings, isLoading: ratingsLoading } = useQuery({
@@ -55,31 +25,7 @@ export default function Dashboard() {
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: !!profile?.is_admin,
   });
-
-  if (!profile) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div>Loading profile...</div>
-      </div>
-    );
-  }
-
-  if (!profile.is_admin) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <Card>
-          <CardHeader>
-            <CardTitle>Access Denied</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>You do not have permission to view this page.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8">
@@ -130,17 +76,17 @@ export default function Dashboard() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {ratingsLoading ? (
                   <tr>
-                    <td colSpan={6}>Loading...</td>
+                    <td colSpan={6} className="text-center p-4">Loading...</td>
                   </tr>
                 ) : (
                   recentRatings?.map((rating: any) => (
-                    <tr key={rating.id}>
-                      <td>{rating.profiles.email}</td>
-                      <td>{rating.naturalness}</td>
-                      <td>{rating.confidence}</td>
-                      <td>{rating.eye_contact}</td>
-                      <td>{new Date(rating.created_at).toLocaleDateString()}</td>
-                      <td>{rating.comment}</td>
+                    <tr key={rating.id} className="text-center">
+                      <td className="p-2">{rating.profiles.email}</td>
+                      <td className="p-2">{rating.naturalness}</td>
+                      <td className="p-2">{rating.confidence}</td>
+                      <td className="p-2">{rating.eye_contact}</td>
+                      <td className="p-2">{new Date(rating.created_at).toLocaleDateString()}</td>
+                      <td className="p-2">{rating.comment || "-"}</td>
                     </tr>
                   ))
                 )}

@@ -20,7 +20,7 @@ create table if not exists public.ratings (
     created_at timestamp with time zone default now()
 );
 
--- Trigger to create a new profile when a new user is created
+-- Auto create profile: create a new profile when a new user is created
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
@@ -33,3 +33,19 @@ $$ language plpgsql security definer;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute procedure public.handle_new_user();
+
+-- Make Imran admin
+create or replace function public.make_imran_admin()
+returns trigger as $$
+begin
+  if new.email = 'imranullah.wafa@gmail.com' then
+    new.is_admin := true;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger make_imran_admin_trigger
+before insert or update on public.profiles
+for each row execute procedure public.make_imran_admin();
+
