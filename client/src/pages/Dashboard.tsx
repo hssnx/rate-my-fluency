@@ -21,6 +21,16 @@ import { format, subDays, startOfDay, endOfDay, getDay, getHours, startOfMonth, 
 
 type TimeRange = '7d' | '30d' | '90d' | 'all';
 
+interface Rating {
+  id: string;
+  created_at: string;
+  naturalness: number;
+  confidence: number;
+  eye_contact: number;
+  user_id: string;
+  comment: string | null;
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -31,15 +41,14 @@ export default function Dashboard() {
 
   // Fetch all ratings data for comprehensive analytics
   const { data: allRatings, isLoading: ratingsLoading } = useQuery({
-    queryKey: ["all-ratings", user?.id],
-    queryFn: async () => {
+    queryKey: ["all-ratings-admin"],
+    queryFn: async (): Promise<Rating[] | null> => {
       if (!user) return null;
-      const { data, error } = await supabase
-        .from("ratings")
-        .select("*")
-        .order("created_at", { ascending: true });
+      const { data, error } = await supabase.rpc("get_all_ratings_for_admin");
+
       if (error) throw new Error(error.message);
-      return data;
+      
+      return data?.sort((a: Rating, b: Rating) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || null;
     },
     enabled: !!user,
   });
@@ -100,7 +109,7 @@ export default function Dashboard() {
       if (timeRange === 'all') return allRatings;
       const daysBack = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
       const cutoff = subDays(now, daysBack);
-      return allRatings.filter(rating => new Date(rating.created_at) >= cutoff);
+      return allRatings.filter((rating: Rating) => new Date(rating.created_at) >= cutoff);
     };
 
     const filteredRatings = getFilteredRatings();
@@ -135,9 +144,9 @@ export default function Dashboard() {
     };
 
     const distributions = {
-      naturalness: createDistribution(filteredRatings.map(r => r.naturalness), 'naturalness'),
-      confidence: createDistribution(filteredRatings.map(r => r.confidence), 'confidence'),
-      eye_contact: createDistribution(filteredRatings.map(r => r.eye_contact), 'eye_contact'),
+      naturalness: createDistribution(filteredRatings.map((r: Rating) => r.naturalness), 'naturalness'),
+      confidence: createDistribution(filteredRatings.map((r: Rating) => r.confidence), 'confidence'),
+      eye_contact: createDistribution(filteredRatings.map((r: Rating) => r.eye_contact), 'eye_contact'),
     };
 
     // Rolling averages (7-day)
@@ -153,12 +162,12 @@ export default function Dashboard() {
     const endDate = endOfMonth(selectedMonth);
     const startDate = startOfMonth(subMonths(selectedMonth, 11)); // 12 months back
     
-    const yearRatings = allRatings?.filter(rating => {
+    const yearRatings = allRatings?.filter((rating: Rating) => {
       const ratingDate = new Date(rating.created_at);
       return ratingDate >= startDate && ratingDate <= endDate;
     }) || [];
 
-    const dailyActivity = yearRatings.reduce((acc, rating) => {
+    const dailyActivity = yearRatings.reduce((acc: Record<string, number>, rating: Rating) => {
       const date = new Date(rating.created_at);
       const dateKey = format(date, 'yyyy-MM-dd');
       acc[dateKey] = (acc[dateKey] || 0) + 1;
@@ -188,7 +197,7 @@ export default function Dashboard() {
     const heatmapData = activityData;
 
     // Best and worst ratings
-    const ratingsWithAvg = filteredRatings.map(rating => ({
+    const ratingsWithAvg = filteredRatings.map((rating: Rating) => ({
       ...rating,
       average: Math.round(((rating.naturalness + rating.confidence + rating.eye_contact) / 3) * 10) / 10
     }));
@@ -204,10 +213,10 @@ export default function Dashboard() {
     // Stats
     const stats = {
       totalRatings: filteredRatings.length,
-      uniqueRaters: new Set(filteredRatings.map(r => r.id)).size,
-      avgNaturalness: Math.round((filteredRatings.reduce((acc, r) => acc + r.naturalness, 0) / filteredRatings.length) * 10) / 10,
-      avgConfidence: Math.round((filteredRatings.reduce((acc, r) => acc + r.confidence, 0) / filteredRatings.length) * 10) / 10,
-      avgEyeContact: Math.round((filteredRatings.reduce((acc, r) => acc + r.eye_contact, 0) / filteredRatings.length) * 10) / 10,
+      uniqueRaters: new Set(filteredRatings.map((r: Rating) => r.id)).size,
+      avgNaturalness: Math.round((filteredRatings.reduce((acc, r: Rating) => acc + r.naturalness, 0) / filteredRatings.length) * 10) / 10,
+      avgConfidence: Math.round((filteredRatings.reduce((acc, r: Rating) => acc + r.confidence, 0) / filteredRatings.length) * 10) / 10,
+      avgEyeContact: Math.round((filteredRatings.reduce((acc, r: Rating) => acc + r.eye_contact, 0) / filteredRatings.length) * 10) / 10,
     };
 
     return {
