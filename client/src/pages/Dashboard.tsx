@@ -37,7 +37,6 @@ export default function Dashboard() {
       const { data, error } = await supabase
         .from("ratings")
         .select("*")
-        .eq("user_id", user.id)
         .order("created_at", { ascending: true });
       if (error) throw new Error(error.message);
       return data;
