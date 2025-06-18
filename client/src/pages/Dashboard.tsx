@@ -31,6 +31,12 @@ interface Rating {
   comment: string | null;
 }
 
+interface Profile {
+  id: string;
+  username: string;
+  is_admin: boolean;
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -53,6 +59,18 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  // Fetch all profiles for admin
+  const { data: allProfiles, isLoading: profilesLoading } = useQuery<Profile[] | null>({
+    queryKey: ["all-profiles-admin"],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase.rpc("get_all_profiles_for_admin");
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    enabled: !!user,
+  });
+
   // Fetch current playlist URL
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ["config"],
@@ -66,8 +84,6 @@ export default function Dashboard() {
       return data;
     },
   });
-
-
 
   // Update playlist URL when config data changes
   useEffect(() => {
@@ -213,10 +229,10 @@ export default function Dashboard() {
     // Stats
     const stats = {
       totalRatings: filteredRatings.length,
-      uniqueRaters: new Set(filteredRatings.map((r: Rating) => r.id)).size,
-      avgNaturalness: Math.round((filteredRatings.reduce((acc, r: Rating) => acc + r.naturalness, 0) / filteredRatings.length) * 10) / 10,
-      avgConfidence: Math.round((filteredRatings.reduce((acc, r: Rating) => acc + r.confidence, 0) / filteredRatings.length) * 10) / 10,
-      avgEyeContact: Math.round((filteredRatings.reduce((acc, r: Rating) => acc + r.eye_contact, 0) / filteredRatings.length) * 10) / 10,
+      uniqueRaters: allProfiles?.length || 0,
+      avgNaturalness: (filteredRatings.reduce((acc, r: Rating) => acc + r.naturalness, 0) / (filteredRatings.length || 1)),
+      avgConfidence: (filteredRatings.reduce((acc, r: Rating) => acc + r.confidence, 0) / (filteredRatings.length || 1)),
+      avgEyeContact: (filteredRatings.reduce((acc, r: Rating) => acc + r.eye_contact, 0) / (filteredRatings.length || 1)),
     };
 
     return {
@@ -228,7 +244,7 @@ export default function Dashboard() {
       worstRatings,
       stats
     };
-  }, [allRatings, timeRange, selectedMonth]);
+  }, [allRatings, timeRange, selectedMonth, allProfiles]);
 
   const getScoreBadge = (score: number) => {
     if (score >= 8) return { color: "bg-green-100 text-green-800 border-green-200", label: "excellent" };
@@ -241,7 +257,7 @@ export default function Dashboard() {
     updatePlaylistMutation.mutate(playlistUrl.trim());
   };
 
-  if (ratingsLoading || !processedData) {
+  if (ratingsLoading || profilesLoading || !processedData) {
     return (
       <div className="max-w-screen-xl mx-auto p-6">
         <div className="text-center py-8">
@@ -306,7 +322,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">Avg Naturalness</p>
-                <p className="text-xl font-semibold text-gray-900">{processedData.stats.avgNaturalness}</p>
+                <p className="text-xl font-semibold text-gray-900">{processedData.stats.avgNaturalness.toFixed(1)}</p>
                 <div className="text-xs text-green-600 mt-1">
                   7d avg: {processedData.rollingAverages.naturalness.toFixed(1)}
                 </div>
@@ -321,7 +337,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">Avg Confidence</p>
-                <p className="text-xl font-semibold text-gray-900">{processedData.stats.avgConfidence}</p>
+                <p className="text-xl font-semibold text-gray-900">{processedData.stats.avgConfidence.toFixed(1)}</p>
                 <div className="text-xs text-blue-600 mt-1">
                   7d avg: {processedData.rollingAverages.confidence.toFixed(1)}
                 </div>
@@ -336,7 +352,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">Avg Eye Contact</p>
-                <p className="text-xl font-semibold text-gray-900">{processedData.stats.avgEyeContact}</p>
+                <p className="text-xl font-semibold text-gray-900">{processedData.stats.avgEyeContact.toFixed(1)}</p>
                 <div className="text-xs text-purple-600 mt-1">
                   7d avg: {processedData.rollingAverages.eye_contact.toFixed(1)}
                 </div>
