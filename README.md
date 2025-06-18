@@ -20,10 +20,6 @@ This is a very simple full-stack application that allows users to rate admin's f
 - **Backend:**
   - [Supabase](https://supabase.io/) (Database, Auth, Storage)
 
-## Supabase Setup
-
-1.  **Database Schema:** see `schema.sql`.
-
 ## Usage
 
 Navigate to the local URL provided by Vite. You can sign up, sign in, and start submitting ratings. To grant someone admin access, the developer must manually set the `is_admin` flag to `true` for that user in the `profiles` table.
